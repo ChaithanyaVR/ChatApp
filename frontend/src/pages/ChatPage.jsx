@@ -2,6 +2,7 @@ import axios from 'axios';
 import React,{useState,useEffect, useContext} from 'react'
 import { useRef } from 'react';
 import Avatar from '../components/Avatar';
+import Contacts from '../components/Contacts';
 import Logo from '../components/Logo';
 import {UserContext} from '../context/UserContext'
 
@@ -9,8 +10,8 @@ function ChatPage({socket}) {
   const {username,id} = useContext(UserContext);
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [selectedUserId,setSelectedUserId] = useState(null);
-  const [newMessageText,setNewMessageText] = useState('')
-  const [message, setMessage] = useState('');
+  const [newMessageText,setNewMessageText] = useState('');
+  const [offlinePeople,setOfflinePeople] = useState({});
   const [messages, setMessages] = useState([]);
   const [activeUsers, setActiveUsers] = useState({});
   const divUnderMessages = useRef();
@@ -32,12 +33,11 @@ function ChatPage({socket}) {
     socket.on('connect', onConnect);
     socket.on('ACTIVEUSERS', (data) => {
       console.log('ACTIVEUSERS event received:', data);
-      
       const users={};
       Object.values(data).forEach(user=>{
         users[user.userId]=user.username;
       })
-      setActiveUsers(users);
+      setActiveUsers(users);   
     })
     socket.on('BRD_MSG', (data) => {
       console.log('[' + data.user + ']: ' + data.message);
@@ -55,15 +55,27 @@ function ChatPage({socket}) {
 
 
 
-
-
-
   useEffect(() => {
     const div = divUnderMessages.current;
     if (div) {
       div.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
+
+
+useEffect(()=>{
+axios.get('/people').then(res=>{
+ const offlinePeopleArr =  res.data
+ .filter(p => p._id !== id)
+ .filter(p => !Object.keys(activeUsers).includes(p._id));
+ const offlinePeople = {};
+ offlinePeopleArr.forEach(p => {
+    offlinePeople[p._id] = p;
+ })
+setOfflinePeople(offlinePeople);
+})
+},[activeUsers,id]);
+ 
 
 
   useEffect(() => {
@@ -104,18 +116,24 @@ delete onlinePeopleExclOurUser[id];
         <div className="bg-white w-1/3">
          <Logo/>
           {Object.keys(onlinePeopleExclOurUser).map(userId => (
-            <div key={userId}
-              onClick={()=>setSelectedUserId(userId)}
-              className={"border-b border-gray-100 flex items-center gap-2 cursor-pointer "+(userId === selectedUserId ? 'bg-green-50' : '')}>
-              {userId === selectedUserId && (
-                <div className='w-1 bg-green-500 h-12 rounded-r-md'></div>
-              )}
-              <div className='flex gap-2 py-2 pl-4 items-center'>
-              <Avatar username={activeUsers[userId]} userId={userId}/>
-              <span className='text-gray-800'>{activeUsers[userId]}</span>
-              </div>
-             
-            </div>
+            <Contacts
+            key={userId}
+            id={userId} 
+            online={true}
+            onClick={() => setSelectedUserId(userId)}
+            selected={userId === selectedUserId}
+            username={onlinePeopleExclOurUser[userId]} 
+           />
+          ))}
+          {Object.keys(offlinePeople).map(userId => (
+            <Contacts 
+            key={userId}
+            id={userId} 
+            online={false}
+            onClick={() => setSelectedUserId(userId)}
+            selected={userId === selectedUserId}
+            username={offlinePeople[userId].username} 
+           />
           ))}
         </div>
         <div className="bg-green-100 w-2/3 p-2 flex flex-col">
@@ -161,22 +179,6 @@ delete onlinePeopleExclOurUser[id];
         
         </div>
       </div>
-
-      {/* <div>
-        {messages.map(item => <p> <b>{item?.user}: </b> {item?.message}</p>)}
-        <input className='border border-black' type='text' onChange={(e) => { setMessage(e.target.value) }} value={message} />
-        <button onClick={handleSubmit}>Send</button>
-        <div>
-          <select onChange={(e) => setSelectedUser(e.target.value)} value={selectedUser}>
-            <option value=''>Broadcast to all</option>
-            {Object.keys(activeUsers)
-              .filter(userId => userId !== socket.id)
-              .map(userId => (
-                <option key={userId} value={userId}>{activeUsers[userId].username}</option>
-              ))}
-          </select>
-        </div>
-      </div> */}
     </>
   )
 }

@@ -133,7 +133,10 @@ app.get('/messages/:userId',async(req,res)=>{
  
 })
 
-
+app.get('/people', async(req,res)=>{
+const users = await User.find({},{'_id':1,username:1});
+res.json(users);
+})
 
 
 app.get('/profile',async(req,res)=>{
